@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<!--
+  배포 체크리스트 (Cloudflare Pages)
+  1. cloudflare.com → Workers & Pages → Create → Upload assets
+  2. index.html 파일 드래그 앤 드롭 → 프로젝트명 입력 → Deploy
+  3. 배포 완료 후 생성된 URL (예: wonju-trip.pages.dev) 확인
+  4. 네이버 지도 콘솔 (https://console.ncloud.com) → Application 설정
+     → Web Dynamic Map → 서비스 URL에 배포 URL 추가
+  5. CONFIG.naverMapClientId 에 실제 Client ID 입력 후 재배포
+  6. 팔로워에게 Cloudflare URL 공유
+
+  ※ 데이터 관련 참고사항 (2026-08-21 갱신)
+  - 소금산 그랜드밸리·소금산미디어아트센터·스톤크릭·국립강원전문과학관 4곳의 주소/좌표/
+    운영시간/요금은 "육진대 맵 장소 DB"(Notion, 가족이 직접 관리하는 큐레이션 DB)와
+    대조해 그 값으로 보정했습니다. 전화번호는 DB에 없는 필드라 원주문화재단·원주시청
+    관광포털 등 공식 페이지 조사 결과를 그대로 사용했습니다.
+  - "온정리닭갈비금강막국수 원주점"과 "오크밸리리조트 힐스빌리지"는 위 DB에도 등록되어
+    있지 않아, 오크밸리는 웹 조사 결과로, 온정리닭갈비는 운영시간/요금/전화번호를
+    "확인 필요"로 비워둔 채 사용자가 직접 알려준 주소만 반영했습니다.
+  - 온정리닭갈비·오크밸리의 좌표는 무료 지오코딩(OpenStreetMap Nominatim)으로 확보한
+    도로 단위 근사치입니다. 실제 서비스 배포 시 네이버 지도에서 직접 좌표를 재확인하는
+    것을 권장하며, 가능하면 이 두 곳도 "육진대 맵 장소 DB"에 등록해두면 다음부터는
+    이 페이지와 육진대맵 앱이 같은 데이터를 공유할 수 있습니다.
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>육진대 × 원주여행</title>
+<style>
+  :root {
+    --color-primary: #2D6A4F;
+    --color-primary-dark: #1F4E3A;
+    --color-accent: #F4A261;
+    --color-bg: #F8F9FA;
+    --color-card: #FFFFFF;
+    --color-text: #1C2733;
+    --color-text-secondary: #6B7A89;
+    --color-border: #E5E9EE;
+    --radius: 16px;
+    --shadow: 0 4px 16px rgba(28, 39, 51, 0.08);
+    --max-width: 480px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+  #app {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--color-bg);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ---------- Header & Tabs ---------- */
+  .app-header {
+    padding: calc(18px + var(--safe-top)) 20px 14px;
+    background: linear-gradient(160deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+    color: #fff;
+    border-radius: 0 0 20px 20px;
+    box-shadow: var(--shadow);
+  }
+  .app-header__title { font-size: 21px; font-weight: 800; margin: 0 0 4px; letter-spacing: -0.3px; }
+  .app-header__subtitle { font-size: 13px; opacity: 0.88; margin: 0; }
+
+  .tab-bar {
+    display: flex;
+    gap: 6px;
+    margin: 14px 20px 0;
+    background: rgba(255,255,255,0.94);
+    border-radius: 999px;
+    padding: 4px;
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: var(--safe-top);
+    z-index: 40;
+  }
+  .tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-weight: 700;
+    padding: 10px 0;
+    border-radius: 999px;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  .tab-btn.is-active { background: var(--color-primary); color: #fff; }
+
+  .view { display: none; flex-direction: column; flex: 1; }
+  .view.is-active { display: flex; }
+
+  /* ---------- Summary banner ---------- */
+  .summary-banner {
+    margin: 16px 20px 4px;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+  }
+  .summary-banner strong { color: var(--color-primary); font-weight: 800; }
+  .summary-banner .dot { color: var(--color-border); }
+
+  /* ---------- Course list ---------- */
+  .course-list { padding: 12px 20px 32px; display: flex; flex-direction: column; }
+
+  .place-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .place-card__top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .place-card__badge {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--color-primary); color: #fff;
+    font-size: 13px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .place-card__category {
+    font-size: 12px; font-weight: 700;
+    padding: 3px 9px; border-radius: 999px;
+    background: rgba(45, 106, 79, 0.1); color: var(--color-primary);
+  }
+  .place-card__category.is-accent { background: rgba(244, 162, 97, 0.18); color: #b56a24; }
+  .place-card__name { font-size: 17px; font-weight: 800; margin: 4px 0 8px; line-height: 1.35; }
+
+  .place-card__row {
+    display: flex; align-items: flex-start; gap: 8px;
+    font-size: 13px; color: var(--color-text-secondary);
+    margin-bottom: 6px; line-height: 1.5;
+  }
+  .place-card__row .icon { flex-shrink: 0; width: 16px; text-align: center; }
+  .place-card__row a.link { color: var(--color-primary); font-weight: 600; }
+  .fee-free-badge {
+    display: inline-block; font-size: 11px; font-weight: 800;
+    background: var(--color-accent); color: #fff;
+    padding: 2px 8px; border-radius: 999px; margin-left: 6px;
+  }
+
+  .place-card__actions { display: flex; gap: 8px; margin-top: 12px; }
+  .btn {
+    flex: 1; border: none; border-radius: 12px;
+    padding: 11px 0; font-size: 13px; font-weight: 700;
+    text-align: center;
+  }
+  .btn-primary { background: var(--color-primary); color: #fff; }
+  .btn-secondary { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); }
+
+  .travel-divider {
+    display: flex; align-items: center; justify-content: center;
+    gap: 6px; flex-wrap: wrap;
+    font-size: 12px; color: var(--color-text-secondary);
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .travel-divider::before, .travel-divider::after {
+    content: ""; flex: 1; height: 1px; background: var(--color-border); align-self: center;
+    min-width: 12px;
+  }
+  .travel-divider .seg { white-space: nowrap; }
+  .travel-divider .estimated { opacity: 0.7; }
+
+  /* ---------- Detail Modal ---------- */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(17, 24, 32, 0.55);
+    display: flex; align-items: flex-end; justify-content: center;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.22s ease, visibility 0.22s;
+  }
+  .modal-overlay.is-open { opacity: 1; visibility: visible; }
+  .modal-sheet {
+    width: 100%; max-width: var(--max-width);
+    max-height: 90vh;
+    background: var(--color-card);
+    border-radius: 20px 20px 0 0;
+    display: flex; flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    overflow: hidden;
+  }
+  .modal-overlay.is-open .modal-sheet { transform: translateY(0); }
+  .modal-sheet__grip { width: 36px; height: 4px; background: var(--color-border); border-radius: 999px; margin: 10px auto 2px; flex-shrink: 0; }
+  .modal-sheet__scroll { overflow-y: auto; padding-bottom: calc(20px + var(--safe-bottom)); }
+
+  .modal-hero {
+    height: 150px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 52px;
+    background: linear-gradient(135deg, rgba(45,106,79,0.14), rgba(244,162,97,0.18));
+    position: relative;
+  }
+  .modal-hero .close-btn {
+    position: absolute; top: 12px; right: 14px;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.9); border: none;
+    font-size: 16px; color: var(--color-text);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow);
+  }
+
+  .modal-body { padding: 16px 20px 4px; }
+  .modal-category {
+    display: inline-block; font-size: 12px; font-weight: 700;
+    padding: 3px 10px; border-radius: 999px;
+    background: rgba(45, 106, 79, 0.1); color: var(--color-primary);
+    margin-bottom: 8px;
+  }
+  .modal-title { font-size: 20px; font-weight: 800; margin: 0 0 14px; line-height: 1.3; }
+  .modal-desc { font-size: 13px; color: var(--color-text-secondary); line-height: 1.6; margin: 0 0 16px; }
+
+  .modal-info-block { border-top: 1px solid var(--color-border); padding: 14px 0; }
+  .modal-info-block__label { font-size: 12px; font-weight: 700; color: var(--color-text-secondary); margin: 0 0 6px; display: flex; align-items: center; gap: 6px; }
+  .modal-info-block__value { font-size: 14px; line-height: 1.6; white-space: pre-line; }
+  .modal-info-block__value.is-link { color: var(--color-primary); font-weight: 700; }
+  .modal-info-block__sub { font-size: 12px; color: var(--color-text-secondary); margin: 6px 0 0; line-height: 1.6; }
+  .modal-info-block__sub li { margin-bottom: 2px; }
+
+  .modal-minimap {
+    height: 160px; border-radius: 12px; overflow: hidden;
+    background: var(--color-bg); border: 1px solid var(--color-border);
+    margin-top: 6px;
+    position: relative;
+  }
+  .map-fallback {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 6px; padding: 14px; text-align: center;
+    color: var(--color-text-secondary); font-size: 12px; line-height: 1.5;
+    background: repeating-linear-gradient(135deg, #F1F3F5, #F1F3F5 10px, #F8F9FA 10px, #F8F9FA 20px);
+  }
+  .map-fallback .pin { font-size: 26px; }
+
+  .modal-actions { padding: 16px 20px 6px; display: flex; flex-direction: column; gap: 8px; }
+
+  /* ---------- Map tab ---------- */
+  .map-view-wrap { flex: 1; display: flex; flex-direction: column; position: relative; }
+  #naver-map {
+    flex: 1; min-height: 320px;
+    background: var(--color-border);
+  }
+  .map-fallback-full {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 30px; text-align: center;
+    background: var(--color-bg);
+  }
+  .map-fallback-full .big-pin { font-size: 40px; }
+  .map-fallback-full h3 { margin: 0; font-size: 15px; }
+  .map-fallback-full p { margin: 0; font-size: 12.5px; color: var(--color-text-secondary); line-height: 1.6; }
+  .map-fallback-full .fallback-order { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 6px; }
+  .map-fallback-full .fallback-order__item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--color-card); border: 1px solid var(--color-border);
+    border-radius: 10px; padding: 8px 10px; font-size: 12.5px; text-align: left;
+  }
+  .map-fallback-full .fallback-order__badge {
+    width: 20px; height: 20px; border-radius: 50%; background: var(--color-primary); color: #fff;
+    font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+
+  .map-toast {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    z-index: 30;
+    background: rgba(28, 39, 51, 0.92); color: #fff;
+    font-size: 12.5px; font-weight: 600;
+    padding: 9px 16px; border-radius: 999px;
+    box-shadow: var(--shadow);
+    opacity: 0; transition: opacity 0.2s ease;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .map-toast.is-visible { opacity: 1; }
+
+  .map-bottom-panel {
+    background: var(--color-card);
+    border-top: 1px solid var(--color-border);
+    padding: 14px 18px calc(14px + var(--safe-bottom));
+    box-shadow: 0 -4px 16px rgba(28,39,51,0.06);
+    z-index: 10;
+  }
+  .map-bottom-panel__current { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .map-bottom-panel__badge {
+    width: 24px; height: 24px; border-radius: 50%; background: var(--color-primary); color: #fff;
+    font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .map-bottom-panel__name { font-size: 15px; font-weight: 800; }
+  .map-bottom-panel__meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
+  .map-bottom-panel__nav { display: flex; gap: 8px; }
+  .map-bottom-panel__nav .btn:disabled { opacity: 0.4; }
+
+  /* naver marker label */
+  .pin-wrap { position: relative; width: 32px; height: 42px; }
+  .pin-label {
+    position: absolute; left: 50%; top: -6px; transform: translate(-50%, -100%);
+    background: #fff; border: 1px solid var(--color-border);
+    border-radius: 8px; padding: 3px 8px;
+    font-size: 11px; font-weight: 700; color: var(--color-text);
+    white-space: nowrap; box-shadow: var(--shadow);
+  }
+  .pin-label.is-current { background: var(--color-accent); color: #fff; border-color: var(--color-accent); }
+
+  @media (min-width: 481px) {
+    #app { border-left: 1px solid var(--color-border); border-right: 1px solid var(--color-border); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header class="app-header">
+    <p class="app-header__title">육진대 × 원주여행</p>
+    <p class="app-header__subtitle">육진대 멤버들과 함께 떠나는 원주 하루 여행</p>
+  </header>
+
+  <nav class="tab-bar" role="tablist">
+    <button class="tab-btn is-active" data-tab="course" role="tab" aria-selected="true">코스목록</button>
+    <button class="tab-btn" data-tab="map" role="tab" aria-selected="false">지도</button>
+  </nav>
+
+  <!-- ===================== 코스목록 탭 ===================== -->
+  <section class="view is-active" id="view-course">
+    <div class="summary-banner" id="summary-banner">
+      총 6곳 · 이동 정보를 계산하고 있어요...
+    </div>
+    <div class="course-list" id="course-list"></div>
+  </section>
+
+  <!-- ===================== 지도 탭 ===================== -->
+  <section class="view" id="view-map">
+    <div class="map-view-wrap">
+      <div id="naver-map"></div>
+      <div class="map-toast" id="map-toast"></div>
+      <div class="map-fallback-full" id="map-fallback-full" hidden>
+        <div class="big-pin">🗺️</div>
+        <h3>지도를 표시할 수 없어요</h3>
+        <p>네이버 지도 Client ID가 아직 설정되지 않았어요.<br>배포 후 CONFIG.naverMapClientId에 실제 Client ID를 입력하면<br>지도가 정상적으로 표시돼요.</p>
+        <div class="fallback-order" id="fallback-order"></div>
+      </div>
+    </div>
+    <div class="map-bottom-panel">
+      <div class="map-bottom-panel__current">
+        <div class="map-bottom-panel__badge" id="panel-badge">1</div>
+        <div>
+          <div class="map-bottom-panel__name" id="panel-name">-</div>
+          <div class="map-bottom-panel__meta" id="panel-meta">-</div>
+        </div>
+      </div>
+      <div class="map-bottom-panel__nav">
+        <button class="btn btn-secondary" id="btn-prev">← 이전 장소</button>
+        <button class="btn btn-primary" id="btn-next">다음 장소 →</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ===================== 상세보기 모달 ===================== -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-sheet__grip"></div>
+    <div class="modal-sheet__scroll">
+      <div class="modal-hero" id="modal-hero">
+        <button class="close-btn" id="modal-close-x" aria-label="닫기">✕</button>
+        <span id="modal-hero-emoji">📍</span>
+      </div>
+      <div class="modal-body">
+        <span class="modal-category" id="modal-category">명소</span>
+        <h2 class="modal-title" id="modal-title">장소명</h2>
+        <p class="modal-desc" id="modal-desc"></p>
+
+        <div class="modal-info-block">
+          <p class="modal-info-block__label">🕒 운영시간</p>
+          <p class="modal-info-block__value" id="modal-hours"></p>
+          <ul class="modal-info-block__sub" id="modal-hours-detail"></ul>
+        </div>
+
+        <div class="modal-info-block">
+          <p class="modal-info-block__label">💳 입장료 / 이용요금</p>
+          <p class="modal-info-block__value" id="modal-fee"></p>
+        </div>
+
+        <div class="modal-info-block">
+          <p class="modal-info-block__label">📞 전화번호</p>
+          <p class="modal-info-block__value" id="modal-phone"></p>
+        </div>
+
+        <div class="modal-info-block">
+          <p class="modal-info-block__label">📍 주소</p>
+          <p class="modal-info-block__value is-link" id="modal-address"></p>
+          <div class="modal-minimap" id="modal-minimap"></div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <a class="btn btn-primary" id="modal-directions-btn" target="_blank" rel="noopener noreferrer">네이버 지도로 길찾기</a>
+        <button class="btn btn-secondary" id="modal-close-btn">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===================== 설정 ===================== */
+const CONFIG = {
+  naverMapClientId: 'YOUR_NAVER_CLIENT_ID'
+};
+
+const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
+const WALK_KMH = 4;
+const CAR_ANIM_MS = 2600;
+
+/* ===================== 데이터 (하드코딩) ===================== */
+const PLACES = {
+  sogeumsan: {
+    id: 'sogeumsan',
+    name: '원주 소금산 그랜드밸리',
+    category: '명소',
+    emoji: '🏞️',
+    address: '강원특별자치도 원주시 지정면 지정로 317 (소금산그랜드밸리 통합센터)',
+    lat: 37.362467,
+    lng: 127.835065,
+    hoursSummary: '하절기(4~10월) 09:00~18:00 · 동절기(11~3월) 09:00~17:00',
+    hoursDetail: [
+      '매표 마감: 하절기 16:30 / 동절기 15:30',
+      '휴장일: 매주 월요일 (공휴일인 경우 다음 평일)'
+    ],
+    fee: '케이블카 코스 대인 18,000원 · 소인 10,000원 (원주시민 대인 6,000원·소인 4,000원)\n트레킹 코스 대인 10,000원 · 소인 6,000원 (원주시민 대인 4,000원·소인 2,000원)',
+    feeFree: false,
+    phone: '033-749-4860',
+    description: '섬강과 소금산 능선이 만나는 간현관광지 일대 복합 관광단지예요. 404m 출렁다리와 소금잔도, 케이블카, 스카이타워까지 원주 대표 명소를 한 번에 즐길 수 있어요.'
+  },
+  mediaart: {
+    id: 'mediaart',
+    name: '원주소금산미디어아트센터',
+    category: '명소',
+    emoji: '🎨',
+    address: '강원특별자치도 원주시 지정면 지정로 317 (소금산그랜드밸리 통합센터 2층)',
+    lat: 37.362811,
+    lng: 127.835025,
+    hoursSummary: '하절기 08:40~18:00 · 동절기 08:40~17:00',
+    hoursDetail: [
+      '매표 마감: 하절기 16:30 / 동절기 15:30',
+      '2025년 9월 개관한 몰입형 디지털 전시관'
+    ],
+    fee: '단독 이용 대인 5,000원 · 소인 3,000원 (그랜드밸리 케이블카 코스 구매 시 무료 포함)',
+    feeFree: false,
+    phone: '033-749-4860',
+    description: '소금산그랜드밸리 통합센터 2층에 자리한 몰입형 미디어아트 전시관이에요. 그랜드밸리 관람과 묶어서 즐기기 좋아요.'
+  },
+  stonecreek: {
+    id: 'stonecreek',
+    name: '스톤크릭',
+    category: '카페',
+    emoji: '☕',
+    address: '강원특별자치도 원주시 지정면 지정로 1101',
+    lat: 37.370980,
+    lng: 127.796595,
+    hoursSummary: '매일 10:30~20:00 (라스트오더 19:00)',
+    hoursDetail: [
+      '연중무휴로 운영해요'
+    ],
+    fee: '아메리카노 5,900원 · 카페라떼 6,500원 · 트로피컬 망고라떼 8,100원 · 모카 쇼콜라 7,300원 · 아몬드 헤이즐넛 라떼 8,200원',
+    feeFree: false,
+    phone: '0507-1359-7423',
+    description: '절벽과 계곡 뷰가 펼쳐지는 로스팅 카페예요. 겨울철에는 앞마당 빙벽으로도 유명해요.'
+  },
+  lunch: {
+    id: 'lunch',
+    name: '온정리닭갈비금강막국수 원주점',
+    category: '식당',
+    emoji: '🍽️',
+    address: '강원 원주시 지정면 월송석화로 452 1층',
+    lat: 37.390923,
+    lng: 127.853247,
+    hoursSummary: '운영시간 확인 필요',
+    hoursDetail: [
+      '현지 소규모 매장으로 온라인에 공식 운영시간이 등록되어 있지 않아요',
+      '방문 전 전화 문의를 권장해요'
+    ],
+    fee: '가격 정보 확인 필요 (매장 문의)',
+    feeFree: false,
+    phone: null,
+    description: '닭갈비와 막국수를 함께 즐길 수 있는 지정면 현지 맛집이에요. 소금산 관광 후 점심 코스로 좋아요.'
+  },
+  science: {
+    id: 'science',
+    name: '국립강원전문과학관',
+    category: '명소',
+    emoji: '🔬',
+    address: '강원특별자치도 원주시 북원로 2790 (태장동)',
+    lat: 37.391424,
+    lng: 127.953359,
+    hoursSummary: '09:30~17:30 (입장마감 17:00)',
+    hoursDetail: [
+      '휴관일: 매주 월요일(공휴일 겹치면 다음 평일)·1월 1일·설날 및 추석 당일',
+      '2025년 11월 개관한 국내 최초 생명·의료과학 특화 국립과학관'
+    ],
+    fee: '일반 3,000원(단체 2,000원) · 어린이·청소년 2,000원(단체 1,500원) · 6세 이하·65세 이상 무료',
+    feeFree: false,
+    phone: '033-749-3500',
+    description: '국내 최초 생명·의료과학 특화 국립과학관이자 강원권 최초 국립과학관이에요.'
+  },
+  okvalley: {
+    id: 'okvalley',
+    name: '원주 오크밸리리조트 힐스빌리지',
+    category: '숙소',
+    emoji: '🏨',
+    address: '강원특별자치도 원주시 지정면 오크밸리2길 40',
+    lat: 37.410372,
+    lng: 127.819507,
+    hoursSummary: '체크인 15:00 · 체크아웃 11:00',
+    hoursDetail: [
+      '부대시설(수영장·사우나 등)은 시설별 운영시간이 달라요',
+      '수영장 10:00~18:00 · 사우나 07:00~19:00 (변동 가능, 예약 시 재확인 권장)'
+    ],
+    fee: '숙박 요금은 예약 시점·객실 타입에 따라 상이 (공식 홈페이지 참고)\n부대시설 이용료 별도 (수영장·사우나 등 대인 약 30,000원대)',
+    feeFree: false,
+    phone: '1588-7676',
+    description: '육진대 멤버들이 하룻밤 묵은 오크밸리리조트 힐스빌리지예요. 근처 밸리빌리지 놀이동산과 함께 즐기기 좋아요.'
+  }
+};
+
+// 이 페이지는 육진대 멤버들이 실제로 다녀온 여행을 소개하는 글이라, 노출 순서는
+// 지리적 최적해가 아니라 "실제로 다녀온 순서" 그대로 둔다.
+// (참고: 지정면 클러스터 내부에서 스톤크릭을 온정리닭갈비보다 먼저 방문하면
+//  총 이동거리를 약 1.6km 줄일 수 있다 — 추후 여행 플래너 앱으로 발전시킬 때
+//  동선 최적화 로직에 참고할 것.)
+const ROUTE_ORDER = ['sogeumsan', 'mediaart', 'lunch', 'science', 'stonecreek', 'okvalley'];
+const ROUTE = ROUTE_ORDER.map((id) => PLACES[id]);
+
+/* ===================== 유틸 ===================== */
+function haversineKm(a, b) {
+  const R = 6371;
+  const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+  const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+  const lat1 = (a.lat * Math.PI) / 180;
+  const lat2 = (b.lat * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function formatKm(m) { return m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`; }
+function formatMin(min) {
+  min = Math.max(1, Math.round(min));
+  if (min < 60) return `${min}분`;
+  const h = Math.floor(min / 60), r = min % 60;
+  return r === 0 ? `${h}시간` : `${h}시간 ${r}분`;
+}
+function telHref(phone) { return `tel:${phone.replace(/[^0-9+]/g, '')}`; }
+function mapSearchUrl(place) { return `https://map.naver.com/p/search/${encodeURIComponent(place.name + ' ' + place.address)}`; }
+function toWebMercator(lat, lng) {
+  const R = 20037508.34;
+  const x = (lng * R) / 180;
+  const y = (Math.log(Math.tan(((90 + lat) * Math.PI) / 360)) / (Math.PI / 180)) * (R / 180);
+  return { x, y };
+}
+function buildWebDirectionsUrl(place) {
+  const { x, y } = toWebMercator(place.lat, place.lng);
+  return `https://map.naver.com/p/directions/-/${x},${y},${encodeURIComponent(place.name)}/-/car`;
+}
+function buildNmapUrl(place) {
+  const params = new URLSearchParams();
+  params.set('dlat', place.lat);
+  params.set('dlng', place.lng);
+  params.set('dname', place.name);
+  params.set('appname', location.origin || 'yukjindae-planner');
+  return `nmap://route/car?${params.toString()}`;
+}
+function isMobileUA() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); }
+
+/* ===================== 구간(OSRM) 계산 ===================== */
+// segments[i] = ROUTE[i] → ROUTE[i+1]
+let SEGMENTS = ROUTE.slice(1).map((to, i) => {
+  const from = ROUTE[i];
+  const straightM = haversineKm(from, to) * 1000;
+  return { from, to, distanceM: straightM, durationS: (straightM / 1000 / 30) * 3600, walkMin: (straightM / 1000 / WALK_KMH) * 60, geometry: [[from.lat, from.lng], [to.lat, to.lng]], estimated: true };
+});
+
+async function fetchOsrmSegment(from, to) {
+  try {
+    const url = `${OSRM_BASE}/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.code !== 'Ok' || !data.routes || !data.routes[0]) throw new Error('no route');
+    const route = data.routes[0];
+    const straightM = haversineKm(from, to) * 1000;
+    return {
+      from, to,
+      distanceM: route.distance,
+      durationS: route.duration,
+      walkMin: (straightM / 1000 / WALK_KMH) * 60,
+      geometry: route.geometry.coordinates.map((c) => [c[1], c[0]]),
+      estimated: false
+    };
+  } catch (err) {
+    console.warn('OSRM 요청 실패, 직선거리로 대체합니다:', err);
+    const straightM = haversineKm(from, to) * 1000;
+    return { from, to, distanceM: straightM, durationS: (straightM / 1000 / 30) * 3600, walkMin: (straightM / 1000 / WALK_KMH) * 60, geometry: [[from.lat, from.lng], [to.lat, to.lng]], estimated: true };
+  }
+}
+
+async function resolveAllSegments() {
+  const pairs = ROUTE.slice(1).map((to, i) => [ROUTE[i], to]);
+  const results = await Promise.all(pairs.map(([f, t]) => fetchOsrmSegment(f, t)));
+  SEGMENTS = results;
+  return results;
+}
+
+/* ===================== 코스목록 렌더 ===================== */
+function categoryChipClass(category) {
+  return (category === '식당' || category === '숙소') ? 'place-card__category is-accent' : 'place-card__category';
+}
+
+function renderPlaceCard(place, index) {
+  const feeBadge = place.feeFree ? '<span class="fee-free-badge">무료</span>' : '';
+  const phoneRow = place.phone
+    ? `<div class="place-card__row"><span class="icon">📞</span><a class="link" href="${telHref(place.phone)}">${place.phone}</a></div>`
+    : `<div class="place-card__row"><span class="icon">📞</span><span>전화번호 확인 필요</span></div>`;
+
+  return `
+    <div class="place-card" data-place="${place.id}">
+      <div class="place-card__top">
+        <div class="place-card__badge">${index + 1}</div>
+        <span class="${categoryChipClass(place.category)}">${place.emoji} ${place.category}</span>
+      </div>
+      <p class="place-card__name">${place.name}</p>
+      <div class="place-card__row"><span class="icon">📍</span><a class="link" href="${mapSearchUrl(place)}" target="_blank" rel="noopener noreferrer">${place.address}</a></div>
+      <div class="place-card__row"><span class="icon">🕒</span><span>${place.hoursSummary}</span></div>
+      <div class="place-card__row"><span class="icon">💳</span><span>${place.fee.split('\n')[0]}${feeBadge}</span></div>
+      ${phoneRow}
+      <div class="place-card__actions">
+        <button class="btn btn-secondary" data-action="detail" data-place="${place.id}">상세보기</button>
+        <a class="btn btn-primary" href="${mapSearchUrl(place)}" target="_blank" rel="noopener noreferrer">지도보기</a>
+      </div>
+    </div>
+  `;
+}
+
+function renderTravelDivider(segment, resolved) {
+  if (!resolved) {
+    return `<div class="travel-divider estimated"><span class="seg">🚗 이동 정보 계산 중...</span></div>`;
+  }
+  const carMin = formatMin(segment.durationS / 60);
+  const walkText = segment.distanceM > 15000 ? '도보 이동 어려움' : `도보 약 ${formatMin(segment.walkMin)}`;
+  const est = segment.estimated ? ' (예상)' : '';
+  return `<div class="travel-divider"><span class="seg">🚗 자차 ${carMin} · ${formatKm(segment.distanceM)}${est}</span><span class="dot">/</span><span class="seg">🚶 ${walkText}</span></div>`;
+}
+
+function renderCourseList(resolved) {
+  const list = document.getElementById('course-list');
+  let html = '';
+  ROUTE.forEach((place, i) => {
+    html += renderPlaceCard(place, i);
+    if (i < ROUTE.length - 1) html += renderTravelDivider(SEGMENTS[i], resolved);
+  });
+  list.innerHTML = html;
+  list.querySelectorAll('[data-action="detail"]').forEach((btn) => {
+    btn.addEventListener('click', () => openDetailModal(btn.dataset.place));
+  });
+}
+
+function renderSummaryBanner(resolved) {
+  const el = document.getElementById('summary-banner');
+  if (!resolved) {
+    el.innerHTML = `총 <strong>${ROUTE.length}곳</strong> <span class="dot">·</span> 이동 정보를 계산하고 있어요...`;
+    return;
+  }
+  const totalM = SEGMENTS.reduce((s, seg) => s + seg.distanceM, 0);
+  const totalMin = SEGMENTS.reduce((s, seg) => s + seg.durationS / 60, 0);
+  el.innerHTML = `총 <strong>${ROUTE.length}곳</strong> <span class="dot">·</span> 예상 이동시간 약 <strong>${formatMin(totalMin)}</strong> <span class="dot">·</span> 총 거리 약 <strong>${formatKm(totalM)}</strong>`;
+}
+
+/* ===================== 상세 모달 ===================== */
+let naverReady = false;
+let currentModalPlace = null;
+
+function openDetailModal(placeId) {
+  const place = PLACES[placeId];
+  document.getElementById('modal-hero-emoji').textContent = place.emoji;
+  document.getElementById('modal-category').textContent = `${place.emoji} ${place.category}`;
+  document.getElementById('modal-title').textContent = place.name;
+  document.getElementById('modal-desc').textContent = place.description;
+  document.getElementById('modal-hours').textContent = place.hoursSummary;
+  document.getElementById('modal-hours-detail').innerHTML = place.hoursDetail.map((h) => `<li>${h}</li>`).join('');
+  document.getElementById('modal-fee').textContent = place.fee;
+  const phoneEl = document.getElementById('modal-phone');
+  phoneEl.innerHTML = place.phone
+    ? `<a class="modal-info-block__value is-link" href="${telHref(place.phone)}">${place.phone} (탭하여 전화 연결)</a>`
+    : `전화번호 확인 필요`;
+  const addressEl = document.getElementById('modal-address');
+  addressEl.textContent = `${place.address} (탭하여 네이버 지도 열기)`;
+  addressEl.onclick = () => window.open(mapSearchUrl(place), '_blank', 'noopener');
+
+  const directionsBtn = document.getElementById('modal-directions-btn');
+  const webUrl = buildWebDirectionsUrl(place);
+  directionsBtn.href = webUrl;
+  if (isMobileUA()) {
+    directionsBtn.onclick = (e) => {
+      e.preventDefault();
+      const fallback = setTimeout(() => window.open(webUrl, '_blank', 'noopener'), 1200);
+      window.addEventListener('pagehide', () => clearTimeout(fallback), { once: true });
+      location.href = buildNmapUrl(place);
+    };
+  } else {
+    directionsBtn.onclick = null;
+  }
+
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.add('is-open');
+  history.pushState({ modal: true }, '');
+  currentModalPlace = place;
+  renderMiniMap(place);
+  ensureNaverScriptLoading(); // 지도 탭을 열지 않았어도 상세보기에서 바로 미니맵이 뜨도록 로드를 트리거한다.
+}
+
+function closeDetailModal() {
+  const overlay = document.getElementById('modal-overlay');
+  if (!overlay.classList.contains('is-open')) return;
+  overlay.classList.remove('is-open');
+  currentModalPlace = null;
+  if (history.state && history.state.modal) history.back();
+}
+
+function renderMiniMap(place) {
+  const el = document.getElementById('modal-minimap');
+  el.innerHTML = '';
+  if (!naverReady || !window.naver || !window.naver.maps) {
+    el.innerHTML = `<div class="map-fallback"><span class="pin">📍</span><span>지도 미리보기는 네이버 지도 Client ID 설정 후 표시돼요.<br>위 주소를 탭하면 네이버 지도로 바로 이동할 수 있어요.</span></div>`;
+    return;
+  }
+  try {
+    const map = new naver.maps.Map(el, {
+      center: new naver.maps.LatLng(place.lat, place.lng),
+      zoom: 16,
+      logoControlOptions: { position: naver.maps.Position.TOP_LEFT }
+    });
+    new naver.maps.Marker({ position: new naver.maps.LatLng(place.lat, place.lng), map, icon: pinIcon(place, ROUTE_ORDER.indexOf(place.id) + 1, false) });
+  } catch (err) {
+    console.warn('미니맵 렌더 실패:', err);
+    el.innerHTML = `<div class="map-fallback"><span class="pin">📍</span><span>지도를 불러오지 못했어요.</span></div>`;
+  }
+}
+
+/* ===================== 탭 전환 ===================== */
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b) => {
+    const active = b.dataset.tab === tab;
+    b.classList.toggle('is-active', active);
+    b.setAttribute('aria-selected', String(active));
+  });
+  document.getElementById('view-course').classList.toggle('is-active', tab === 'course');
+  document.getElementById('view-map').classList.toggle('is-active', tab === 'map');
+  if (tab === 'map') {
+    // 지도 탭이 화면에 보이는 상태에서 초기화해야 컨테이너가 0 크기가 되는 문제를 피할 수 있다.
+    if (scriptState === 'ready' && !naverMap) {
+      try { initOverviewMap(); } catch (err) { console.error('네이버 지도 초기화 실패:', err); showMapFallback(); }
+    } else if (scriptState === 'failed') {
+      showMapFallback();
+    } else if (naverMap) {
+      refitMapBounds();
+    }
+    ensureNaverScriptLoading();
+  }
+}
+
+/* ===================== 오버뷰 지도 ===================== */
+let naverMap = null;
+let mapMarkers = [];
+let traveledPolyline = null;
+let remainingPolyline = null;
+let carMarker = null;
+let carInfoWindow = null;
+let carAnimRaf = null;
+let currentIndex = 0;
+
+function pinIcon(place, number, isCurrent) {
+  const color = isCurrent ? '#F4A261' : '#2D6A4F';
+  return {
+    content: `
+      <div class="pin-wrap">
+        <svg width="32" height="42" viewBox="0 0 32 42" style="position:absolute;top:6px;left:0;">
+          <path d="M16 0C7.163 0 0 7.163 0 16c0 11.2 16 26 16 26s16-14.8 16-26C32 7.163 24.837 0 16 0z" fill="${color}"/>
+        </svg>
+        <div style="position:absolute;top:6px;left:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:800;">${number}</div>
+        <div class="pin-label ${isCurrent ? 'is-current' : ''}">${place.name}</div>
+      </div>
+    `,
+    anchor: new naver.maps.Point(16, 48)
+  };
+}
+
+function carIcon(mode) {
+  const emoji = mode === 'walk' ? '🚶' : '🚗';
+  return { content: `<div style="font-size:26px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));">${emoji}</div>`, anchor: new naver.maps.Point(13, 13) };
+}
+
+function pathLatLngs(coords) { return coords.map((c) => new naver.maps.LatLng(c[0], c[1])); }
+
+function fullPathCoords() {
+  let coords = [[ROUTE[0].lat, ROUTE[0].lng]];
+  SEGMENTS.forEach((seg) => { coords = coords.concat(seg.geometry.slice(1)); });
+  return coords;
+}
+
+function initOverviewMap() {
+  const el = document.getElementById('naver-map');
+  const startPlace = ROUTE[currentIndex]; // 지도가 뜨기 전에 이미 이전/다음으로 이동했을 수도 있으므로 현재 위치 기준으로 초기화한다.
+  naverMap = new naver.maps.Map(el, {
+    center: new naver.maps.LatLng(startPlace.lat, startPlace.lng),
+    zoom: 12,
+    logoControlOptions: { position: naver.maps.Position.TOP_LEFT }
+  });
+
+  mapMarkers = ROUTE.map((place, i) => new naver.maps.Marker({
+    position: new naver.maps.LatLng(place.lat, place.lng),
+    map: naverMap,
+    icon: pinIcon(place, i + 1, i === currentIndex),
+    zIndex: 10
+  }));
+
+  const full = fullPathCoords();
+  remainingPolyline = new naver.maps.Polyline({ map: naverMap, path: pathLatLngs(full), strokeColor: '#9AA5B1', strokeOpacity: 0.9, strokeWeight: 4, strokeStyle: 'shortdash' });
+  traveledPolyline = new naver.maps.Polyline({ map: naverMap, path: [], strokeColor: '#2D6A4F', strokeOpacity: 0.95, strokeWeight: 5 });
+
+  carMarker = new naver.maps.Marker({ position: new naver.maps.LatLng(startPlace.lat, startPlace.lng), map: naverMap, icon: carIcon('car'), zIndex: 25 });
+  carInfoWindow = new naver.maps.InfoWindow({ content: '', disableAnchor: true, backgroundColor: 'transparent', borderWidth: 0 });
+
+  const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(ROUTE[0].lat, ROUTE[0].lng), new naver.maps.LatLng(ROUTE[0].lat, ROUTE[0].lng));
+  ROUTE.forEach((p) => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
+  naverMap.fitBounds(bounds, { top: 50, right: 40, bottom: 50, left: 40 });
+
+  updateMapUI();
+}
+
+function refitMapBounds() {
+  if (!naverMap) return;
+  const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(ROUTE[0].lat, ROUTE[0].lng), new naver.maps.LatLng(ROUTE[0].lat, ROUTE[0].lng));
+  ROUTE.forEach((p) => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
+  naverMap.fitBounds(bounds, { top: 50, right: 40, bottom: 50, left: 40 });
+}
+
+function showToast(text) {
+  const el = document.getElementById('map-toast');
+  el.textContent = text;
+  el.classList.add('is-visible');
+}
+function hideToast() {
+  document.getElementById('map-toast').classList.remove('is-visible');
+}
+
+function updateMapUI() {
+  const place = ROUTE[currentIndex];
+  document.getElementById('panel-badge').textContent = currentIndex + 1;
+  document.getElementById('panel-name').textContent = place.name;
+  document.getElementById('panel-meta').textContent = `${place.category} · ${currentIndex + 1} / ${ROUTE.length}`;
+  document.getElementById('btn-prev').disabled = currentIndex === 0;
+  document.getElementById('btn-next').disabled = currentIndex === ROUTE.length - 1;
+
+  if (!naverMap) return; // 지도가 아직 로드되지 않았으면(또는 폴백 상태) 여기서 끝낸다.
+
+  mapMarkers.forEach((m, i) => m.setIcon(pinIcon(ROUTE[i], i + 1, i === currentIndex)));
+
+  const full = fullPathCoords();
+  let traveledCount = 0;
+  for (let i = 0; i < currentIndex; i++) traveledCount += SEGMENTS[i].geometry.length - 1;
+  traveledCount += 1;
+  traveledPolyline.setPath(pathLatLngs(full.slice(0, traveledCount)));
+  remainingPolyline.setPath(pathLatLngs(full.slice(traveledCount - 1)));
+
+  if (carMarker) carMarker.setPosition(new naver.maps.LatLng(place.lat, place.lng));
+}
+
+function animateCarAlong(segment, reverse, onDone) {
+  const geometry = reverse ? segment.geometry.slice().reverse() : segment.geometry;
+  const mode = segment.distanceM > 1000 ? 'car' : 'walk';
+  carMarker.setIcon(carIcon(mode));
+  const carMin = formatMin(segment.durationS / 60);
+  const walkMin = formatMin(segment.walkMin);
+  showToast(`🚗 이동 중... 자차 약 ${carMin} / 🚶 도보 약 ${walkMin}`);
+
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min(1, (now - start) / CAR_ANIM_MS);
+    const segFloat = t * (geometry.length - 1);
+    const idx = Math.min(geometry.length - 2, Math.floor(segFloat));
+    const localT = segFloat - idx;
+    const [lat1, lng1] = geometry[idx];
+    const [lat2, lng2] = geometry[Math.min(geometry.length - 1, idx + 1)];
+    const lat = lat1 + (lat2 - lat1) * localT;
+    const lng = lng1 + (lng2 - lng1) * localT;
+    carMarker.setPosition(new naver.maps.LatLng(lat, lng));
+
+    if (t < 1) {
+      carAnimRaf = requestAnimationFrame(tick);
+    } else {
+      hideToast();
+      onDone();
+    }
+  }
+  carAnimRaf = requestAnimationFrame(tick);
+}
+
+function goToStop(nextIndex) {
+  if (nextIndex < 0 || nextIndex >= ROUTE.length || nextIndex === currentIndex) return;
+  if (carAnimRaf) cancelAnimationFrame(carAnimRaf);
+  document.getElementById('btn-prev').disabled = true;
+  document.getElementById('btn-next').disabled = true;
+
+  const reverse = nextIndex < currentIndex;
+  const segment = reverse ? SEGMENTS[nextIndex] : SEGMENTS[currentIndex];
+
+  if (!naverMap) {
+    currentIndex = nextIndex;
+    updateMapUI();
+    return;
+  }
+
+  animateCarAlong(segment, reverse, () => {
+    currentIndex = nextIndex;
+    updateMapUI();
+    const place = ROUTE[currentIndex];
+    if (carInfoWindow) {
+      carInfoWindow.setContent(`<div style="padding:6px 10px;background:#1C2733;color:#fff;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;">📍 도착: ${place.name}</div>`);
+      carInfoWindow.open(naverMap, carMarker);
+      setTimeout(() => carInfoWindow.close(), 2500);
+    }
+  });
+}
+
+/* ===================== 네이버 지도 로딩 =====================
+   상세보기 모달(미니맵)과 지도 탭(오버뷰맵)이 서로 다른 시점에 지도 SDK를 필요로 할 수
+   있어서, "SDK 스크립트 로딩"과 "각 화면에서의 지도 초기화"를 분리한다. 둘 중 어느 쪽이든
+   먼저 트리거하며(ensureNaverScriptLoading은 중복 호출에 안전), 로딩이 끝나면
+   onNaverMapsReady/onNaverMapsFailed가 그 시점에 열려 있는 화면(모달/지도 탭)을 갱신한다. */
+let scriptState = 'idle'; // 'idle' | 'loading' | 'ready' | 'failed'
+
+function showMapFallback() {
+  document.getElementById('map-fallback-full').hidden = false;
+  const el = document.getElementById('fallback-order');
+  el.innerHTML = ROUTE.map((p, i) => `<div class="fallback-order__item"><span class="fallback-order__badge">${i + 1}</span><span>${p.name}</span></div>`).join('');
+  updateMapUI();
+}
+
+function onNaverMapsReady() {
+  if (document.getElementById('view-map').classList.contains('is-active') && !naverMap) {
+    try {
+      initOverviewMap();
+    } catch (err) {
+      console.error('네이버 지도 초기화 실패:', err);
+      showMapFallback();
+    }
+  }
+  if (currentModalPlace) renderMiniMap(currentModalPlace);
+}
+
+function onNaverMapsFailed() {
+  if (document.getElementById('view-map').classList.contains('is-active')) showMapFallback();
+  // 모달의 미니맵은 renderMiniMap이 naverReady 값을 보고 스스로 폴백을 표시하므로 별도 처리가 필요 없다.
+}
+
+function ensureNaverScriptLoading() {
+  if (scriptState !== 'idle') return;
+
+  if (!CONFIG.naverMapClientId || CONFIG.naverMapClientId === 'YOUR_NAVER_CLIENT_ID') {
+    console.warn('naverMapClientId가 설정되지 않아 지도를 표시하지 않습니다. CONFIG.naverMapClientId를 설정해주세요.');
+    scriptState = 'failed';
+    onNaverMapsFailed();
+    return;
+  }
+
+  scriptState = 'loading';
+  const timeout = setTimeout(() => {
+    if (scriptState !== 'loading') return;
+    scriptState = 'failed';
+    onNaverMapsFailed();
+  }, 5000);
+
+  window.__onNaverMapsReady = () => {
+    if (scriptState !== 'loading') return; // 이미 타임아웃으로 실패 처리된 경우
+    clearTimeout(timeout);
+    scriptState = 'ready';
+    naverReady = true;
+    onNaverMapsReady();
+  };
+
+  const script = document.createElement('script');
+  script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${encodeURIComponent(CONFIG.naverMapClientId)}&callback=__onNaverMapsReady`;
+  script.onerror = () => {
+    if (scriptState !== 'loading') return;
+    clearTimeout(timeout);
+    scriptState = 'failed';
+    onNaverMapsFailed();
+  };
+  document.head.appendChild(script);
+}
+
+/* ===================== 초기화 ===================== */
+document.addEventListener('DOMContentLoaded', () => {
+  renderSummaryBanner(false);
+  renderCourseList(false);
+
+  document.querySelectorAll('.tab-btn').forEach((btn) => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+
+  document.getElementById('modal-close-x').addEventListener('click', closeDetailModal);
+  document.getElementById('modal-close-btn').addEventListener('click', closeDetailModal);
+  document.getElementById('modal-overlay').addEventListener('click', (e) => { if (e.target.id === 'modal-overlay') closeDetailModal(); });
+  window.addEventListener('popstate', () => { document.getElementById('modal-overlay').classList.remove('is-open'); currentModalPlace = null; });
+
+  document.getElementById('btn-prev').addEventListener('click', () => goToStop(currentIndex - 1));
+  document.getElementById('btn-next').addEventListener('click', () => goToStop(currentIndex + 1));
+
+  updateMapUI();
+
+  resolveAllSegments().then(() => {
+    renderSummaryBanner(true);
+    renderCourseList(true);
+    if (naverMap) {
+      const full = fullPathCoords();
+      remainingPolyline.setPath(pathLatLngs(full));
+    }
+  });
+});
+</script>
+</body>
+</html>
