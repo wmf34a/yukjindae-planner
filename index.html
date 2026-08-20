@@ -1002,7 +1002,9 @@ function ensureNaverScriptLoading() {
     clearTimeout(timeout);
     scriptState = 'ready';
     naverReady = true;
-    onNaverMapsReady();
+    // 네이버 지도 SDK는 이 콜백을 window.naver 할당이 완전히 끝나기 전에 호출할 때가 있어서
+    // (동기 실행 중 호출 시 "naver is not defined" ReferenceError 발생), 한 틱 미뤄서 실행한다.
+    setTimeout(onNaverMapsReady, 0);
   };
 
   const script = document.createElement('script');
