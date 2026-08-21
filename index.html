@@ -312,6 +312,12 @@
   .map-bottom-panel__meta { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
   .map-bottom-panel__nav { display: flex; gap: 8px; }
   .map-bottom-panel__nav .btn:disabled { opacity: 0.4; }
+  .btn-icon {
+    flex: 0 0 44px; padding: 0; font-size: 18px;
+    background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .btn-icon.is-active { background: rgba(45, 106, 79, 0.12); border-color: var(--color-primary); }
 
   /* naver marker label */
   .pin-wrap { position: relative; width: 32px; height: 42px; }
@@ -372,6 +378,7 @@
       </div>
       <div class="map-bottom-panel__nav">
         <button class="btn btn-secondary" id="btn-prev">← 이전 장소</button>
+        <button class="btn btn-icon" id="btn-mylocation" aria-label="내 위치">📍</button>
         <button class="btn btn-primary" id="btn-next">다음 장소 →</button>
       </div>
     </div>
@@ -795,6 +802,8 @@ let carMarker = null;
 let carInfoWindow = null;
 let carAnimRaf = null;
 let currentIndex = 0;
+let pinInfoWindow = null;
+let myLocationMarker = null;
 
 function pinIcon(place, number, isCurrent) {
   const color = isCurrent ? '#F4A261' : '#2D6A4F';
@@ -815,6 +824,33 @@ function pinIcon(place, number, isCurrent) {
 function carIcon(mode) {
   const emoji = mode === 'walk' ? '🚶' : '🚗';
   return { content: `<div style="font-size:26px;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.35));">${emoji}</div>`, anchor: new naver.maps.Point(13, 13) };
+}
+
+function myLocationIcon() {
+  return {
+    content: `<div style="width:16px;height:16px;border-radius:50%;background:#4285F4;border:3px solid #fff;box-shadow:0 0 0 3px rgba(66,133,244,0.35), 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+    anchor: new naver.maps.Point(11, 11)
+  };
+}
+
+function pinSummaryContent(place, index) {
+  return `
+    <div style="padding:10px 12px;min-width:170px;max-width:210px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;">
+      <div style="font-size:11px;font-weight:700;color:#2D6A4F;margin-bottom:3px;">${place.emoji} ${place.category}</div>
+      <div style="font-size:14px;font-weight:800;color:#1C2733;margin-bottom:6px;line-height:1.3;">${index + 1}. ${place.name}</div>
+      <div style="font-size:11.5px;color:#6B7A89;line-height:1.5;margin-bottom:8px;">🕒 ${place.hoursSummary}</div>
+      <button type="button" onclick="window.openDetailModal('${place.id}')" style="width:100%;border:none;background:#2D6A4F;color:#fff;font-size:12px;font-weight:700;padding:7px 0;border-radius:8px;cursor:pointer;">상세보기</button>
+    </div>
+  `;
+}
+
+function showPinSummary(index) {
+  const place = ROUTE[index];
+  if (!pinInfoWindow) {
+    pinInfoWindow = new naver.maps.InfoWindow({ content: '', maxWidth: 220, backgroundColor: '#fff', borderColor: '#E5E9EE', borderWidth: 1, anchorSize: new naver.maps.Size(12, 10), pixelOffset: new naver.maps.Point(0, -4) });
+  }
+  pinInfoWindow.setContent(pinSummaryContent(place, index));
+  pinInfoWindow.open(naverMap, mapMarkers[index]);
 }
 
 function pathLatLngs(coords) { return coords.map((c) => new naver.maps.LatLng(c[0], c[1])); }
@@ -840,6 +876,10 @@ function initOverviewMap() {
     icon: pinIcon(place, i + 1, i === currentIndex),
     zIndex: 10
   }));
+  mapMarkers.forEach((marker, i) => {
+    naver.maps.Event.addListener(marker, 'click', () => showPinSummary(i));
+  });
+  naver.maps.Event.addListener(naverMap, 'click', () => { if (pinInfoWindow) pinInfoWindow.close(); });
 
   const full = fullPathCoords();
   remainingPolyline = new naver.maps.Polyline({ map: naverMap, path: pathLatLngs(full), strokeColor: '#9AA5B1', strokeOpacity: 0.9, strokeWeight: 4, strokeStyle: 'shortdash' });
@@ -869,6 +909,50 @@ function showToast(text) {
 }
 function hideToast() {
   document.getElementById('map-toast').classList.remove('is-visible');
+}
+
+function flashToast(text, ms) {
+  showToast(text);
+  setTimeout(hideToast, ms || 2200);
+}
+
+function locateMe() {
+  if (!naverMap) {
+    flashToast('지도가 준비되지 않아 위치를 표시할 수 없어요');
+    return;
+  }
+  if (!navigator.geolocation) {
+    flashToast('이 브라우저는 위치 확인을 지원하지 않아요');
+    return;
+  }
+  const btn = document.getElementById('btn-mylocation');
+  btn.disabled = true;
+  showToast('내 위치 확인 중...');
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      btn.disabled = false;
+      hideToast();
+      const { latitude, longitude } = pos.coords;
+      const latLng = new naver.maps.LatLng(latitude, longitude);
+      if (myLocationMarker) {
+        myLocationMarker.setPosition(latLng);
+      } else {
+        myLocationMarker = new naver.maps.Marker({ position: latLng, map: naverMap, icon: myLocationIcon(), zIndex: 30 });
+      }
+      naverMap.morph(latLng, Math.max(naverMap.getZoom(), 13));
+    },
+    (err) => {
+      btn.disabled = false;
+      const messages = {
+        1: '위치 권한이 거부됐어요. 브라우저 설정에서 허용해주세요',
+        2: '현재 위치를 확인할 수 없어요',
+        3: '위치 확인이 시간 초과됐어요'
+      };
+      flashToast(messages[err.code] || '위치를 확인하지 못했어요');
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+  );
 }
 
 function updateMapUI() {
@@ -926,6 +1010,7 @@ function animateCarAlong(segment, reverse, onDone) {
 function goToStop(nextIndex) {
   if (nextIndex < 0 || nextIndex >= ROUTE.length || nextIndex === currentIndex) return;
   if (carAnimRaf) cancelAnimationFrame(carAnimRaf);
+  if (pinInfoWindow) pinInfoWindow.close();
   document.getElementById('btn-prev').disabled = true;
   document.getElementById('btn-next').disabled = true;
 
@@ -1033,6 +1118,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn-prev').addEventListener('click', () => goToStop(currentIndex - 1));
   document.getElementById('btn-next').addEventListener('click', () => goToStop(currentIndex + 1));
+  document.getElementById('btn-mylocation').addEventListener('click', locateMe);
 
   updateMapUI();
 
