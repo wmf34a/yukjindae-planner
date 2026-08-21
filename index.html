@@ -46,22 +46,26 @@
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
+    height: 100%;
     background: var(--color-bg);
     color: var(--color-text);
     font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
     -webkit-font-smoothing: antialiased;
     overscroll-behavior-y: none;
+    overflow: hidden;
   }
   a { color: inherit; text-decoration: none; }
   button { font-family: inherit; cursor: pointer; }
   #app {
     max-width: var(--max-width);
     margin: 0 auto;
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
     background: var(--color-bg);
     display: flex;
     flex-direction: column;
     position: relative;
+    overflow: hidden;
   }
 
   /* ---------- Header & Tabs ---------- */
@@ -100,8 +104,9 @@
   }
   .tab-btn.is-active { background: var(--color-primary); color: #fff; }
 
-  .view { display: none; flex-direction: column; flex: 1; }
+  .view { display: none; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .view.is-active { display: flex; }
+  #view-map.is-active { overflow: hidden; } /* 지도 탭은 화면에 딱 맞춰 보여주고, 스크롤은 코스목록 탭에서만 */
 
   /* ---------- Summary banner ---------- */
   .summary-banner {
@@ -251,9 +256,9 @@
   .modal-actions { padding: 16px 20px 6px; display: flex; flex-direction: column; gap: 8px; }
 
   /* ---------- Map tab ---------- */
-  .map-view-wrap { flex: 1; display: flex; flex-direction: column; position: relative; }
+  .map-view-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; }
   #naver-map {
-    flex: 1; min-height: 320px;
+    flex: 1; min-height: 0;
     background: var(--color-border);
   }
   .map-fallback-full {
@@ -307,9 +312,9 @@
   .map-bottom-panel__nav { display: flex; gap: 8px; }
   .map-bottom-panel__nav .btn:disabled { opacity: 0.4; }
   .btn-icon {
-    flex: 0 0 44px; padding: 0; font-size: 18px;
+    flex: 0 0 auto; padding: 0 12px; font-size: 12.5px; font-weight: 700; white-space: nowrap;
     background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border);
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
   }
   .btn-icon.is-active { background: rgba(45, 106, 79, 0.12); border-color: var(--color-primary); }
 
@@ -372,7 +377,7 @@
       </div>
       <div class="map-bottom-panel__nav">
         <button class="btn btn-secondary" id="btn-prev">← 이전 장소</button>
-        <button class="btn btn-icon" id="btn-mylocation" aria-label="내 위치">📍</button>
+        <button class="btn btn-icon" id="btn-mylocation" aria-label="내 위치">📍 내 위치</button>
         <button class="btn btn-primary" id="btn-next">다음 장소 →</button>
       </div>
     </div>
@@ -432,7 +437,7 @@ const CONFIG = {
 
 const OSRM_BASE = 'https://router.project-osrm.org/route/v1/driving';
 const WALK_KMH = 4;
-const CAR_ANIM_MS = 2600;
+const CAR_ANIM_MS = 1100;
 
 /* ===================== 데이터 (하드코딩) ===================== */
 const PLACES = {
@@ -790,9 +795,11 @@ let remainingPolyline = null;
 let carMarker = null;
 let carInfoWindow = null;
 let carAnimRaf = null;
+let carAnimFallback = null;
 let currentIndex = 0;
 let pinInfoWindow = null;
 let myLocationMarker = null;
+let viewingMyLocation = false; // 내 위치로 지도를 이동시킨 상태인지(여행지에서 멀리 떨어진 곳일 수 있어, 이전/다음을 누르면 코스로 복귀시킨다)
 
 function pinIcon(place, number, isCurrent) {
   const color = isCurrent ? '#F4A261' : '#2D6A4F';
@@ -930,6 +937,7 @@ function locateMe() {
         myLocationMarker = new naver.maps.Marker({ position: latLng, map: naverMap, icon: myLocationIcon(), zIndex: 30 });
       }
       naverMap.morph(latLng, Math.max(naverMap.getZoom(), 13));
+      viewingMyLocation = true;
     },
     (err) => {
       btn.disabled = false;
@@ -974,11 +982,27 @@ function animateCarAlong(segment, reverse, onDone) {
   const walkMin = formatMin(segment.walkMin);
   showToast(`🚗 이동 중... 자차 약 ${carMin} / 🚶 도보 약 ${walkMin}`);
 
+  // 탭이 백그라운드로 가면 requestAnimationFrame이 브라우저에 의해 무기한 멈출 수 있어
+  // (버튼이 영영 비활성 상태로 남는 원인이었다), setTimeout 안전장치로 항상 종료를 보장한다.
+  let done = false;
+  function finish() {
+    if (done) return;
+    done = true;
+    carAnimRaf = null;
+    clearTimeout(carAnimFallback);
+    carAnimFallback = null;
+    hideToast();
+    carMarker.setPosition(new naver.maps.LatLng(segment.to.lat, segment.to.lng));
+    onDone();
+  }
+  carAnimFallback = setTimeout(finish, CAR_ANIM_MS + 800);
+
   const start = performance.now();
   function tick(now) {
+    if (done) return;
     const t = Math.min(1, (now - start) / CAR_ANIM_MS);
     const segFloat = t * (geometry.length - 1);
-    const idx = Math.min(geometry.length - 2, Math.floor(segFloat));
+    const idx = Math.max(0, Math.min(geometry.length - 2, Math.floor(segFloat)));
     const localT = segFloat - idx;
     const [lat1, lng1] = geometry[idx];
     const [lat2, lng2] = geometry[Math.min(geometry.length - 1, idx + 1)];
@@ -989,17 +1013,31 @@ function animateCarAlong(segment, reverse, onDone) {
     if (t < 1) {
       carAnimRaf = requestAnimationFrame(tick);
     } else {
-      hideToast();
-      onDone();
+      finish();
     }
   }
   carAnimRaf = requestAnimationFrame(tick);
 }
 
 function goToStop(nextIndex) {
-  if (nextIndex < 0 || nextIndex >= ROUTE.length || nextIndex === currentIndex) return;
   if (carAnimRaf) cancelAnimationFrame(carAnimRaf);
+  if (carAnimFallback) clearTimeout(carAnimFallback);
   if (pinInfoWindow) pinInfoWindow.close();
+
+  // 내 위치를 보고 있던 상태(여행지와 멀리 떨어져 있을 수 있음)에서 이전/다음을 누르면,
+  // 그 위치 기준으로 한 칸 이동하는 대신 코스 첫 번째 장소로 돌아가 지도를 다시 보여준다.
+  if (viewingMyLocation) {
+    viewingMyLocation = false;
+    currentIndex = 0;
+    updateMapUI();
+    if (naverMap) {
+      const place = ROUTE[0];
+      naverMap.morph(new naver.maps.LatLng(place.lat, place.lng), 13);
+    }
+    return;
+  }
+
+  if (nextIndex < 0 || nextIndex >= ROUTE.length || nextIndex === currentIndex) return;
   document.getElementById('btn-prev').disabled = true;
   document.getElementById('btn-next').disabled = true;
 
