@@ -109,16 +109,15 @@
     background: var(--color-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
-    padding: 14px 16px;
+    padding: 13px 16px;
     box-shadow: var(--shadow);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
+    font-size: 12.5px;
     color: var(--color-text-secondary);
+    white-space: nowrap;
+    overflow-x: auto;
   }
   .summary-banner strong { color: var(--color-primary); font-weight: 800; }
-  .summary-banner .dot { color: var(--color-border); }
+  .summary-banner .dot { color: var(--color-border); margin: 0 1px; }
 
   /* ---------- Course list ---------- */
   .course-list { padding: 12px 20px 32px; display: flex; flex-direction: column; }
@@ -131,21 +130,16 @@
     box-shadow: var(--shadow);
     position: relative;
   }
-  .place-card__top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .place-card__top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
   .place-card__badge {
     width: 26px; height: 26px; border-radius: 50%;
     background: var(--color-primary); color: #fff;
     font-size: 13px; font-weight: 800;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
+    margin-top: 2px;
   }
-  .place-card__category {
-    font-size: 12px; font-weight: 700;
-    padding: 3px 9px; border-radius: 999px;
-    background: rgba(45, 106, 79, 0.1); color: var(--color-primary);
-  }
-  .place-card__category.is-accent { background: rgba(244, 162, 97, 0.18); color: #b56a24; }
-  .place-card__name { font-size: 17px; font-weight: 800; margin: 4px 0 8px; line-height: 1.35; }
+  .place-card__name { font-size: 17px; font-weight: 800; margin: 0; line-height: 1.35; }
 
   .place-card__row {
     display: flex; align-items: flex-start; gap: 8px;
@@ -637,10 +631,6 @@ async function resolveAllSegments() {
 }
 
 /* ===================== 코스목록 렌더 ===================== */
-function categoryChipClass(category) {
-  return (category === '식당' || category === '숙소') ? 'place-card__category is-accent' : 'place-card__category';
-}
-
 function renderPlaceCard(place, index) {
   const feeBadge = place.feeFree ? '<span class="fee-free-badge">무료</span>' : '';
   const phoneRow = place.phone
@@ -651,9 +641,8 @@ function renderPlaceCard(place, index) {
     <div class="place-card" data-place="${place.id}">
       <div class="place-card__top">
         <div class="place-card__badge">${index + 1}</div>
-        <span class="${categoryChipClass(place.category)}">${place.emoji} ${place.category}</span>
+        <p class="place-card__name">${place.name}</p>
       </div>
-      <p class="place-card__name">${place.name}</p>
       <div class="place-card__row"><span class="icon">📍</span><a class="link" href="${mapSearchUrl(place)}" target="_blank" rel="noopener noreferrer">${place.address}</a></div>
       <div class="place-card__row"><span class="icon">🕒</span><span>${place.hoursSummary}</span></div>
       <div class="place-card__row"><span class="icon">💳</span><span>${place.fee.split('\n')[0]}${feeBadge}</span></div>
@@ -697,7 +686,7 @@ function renderSummaryBanner(resolved) {
   }
   const totalM = SEGMENTS.reduce((s, seg) => s + seg.distanceM, 0);
   const totalMin = SEGMENTS.reduce((s, seg) => s + seg.durationS / 60, 0);
-  el.innerHTML = `총 <strong>${ROUTE.length}곳</strong> <span class="dot">·</span> 예상 이동시간 약 <strong>${formatMin(totalMin)}</strong> <span class="dot">·</span> 총 거리 약 <strong>${formatKm(totalM)}</strong>`;
+  el.innerHTML = `총 <strong>${ROUTE.length}곳</strong> <span class="dot">·</span> 이동 약 <strong>${formatMin(totalMin)}</strong> <span class="dot">·</span> <strong>${formatKm(totalM)}</strong>`;
 }
 
 /* ===================== 상세 모달 ===================== */
