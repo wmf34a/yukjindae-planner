@@ -5675,12 +5675,12 @@
   </header>
 
   <nav class="tab-bar" role="tablist">
-    <button class="tab-btn is-active" data-tab="course" role="tab" aria-selected="true">코스목록</button>
-    <button class="tab-btn" data-tab="map" role="tab" aria-selected="false">지도</button>
+    <button class="tab-btn is-active" data-tab="map" role="tab" aria-selected="true">지도</button>
+    <button class="tab-btn" data-tab="course" role="tab" aria-selected="false">코스목록</button>
   </nav>
 
   <!-- ===================== 코스목록 탭 ===================== -->
-  <section class="view is-active" id="view-course">
+  <section class="view" id="view-course">
     <div class="summary-banner" id="summary-banner">
       총 6곳 · 이동 정보를 계산하고 있어요...
     </div>
@@ -5746,7 +5746,7 @@
   </section>
 
   <!-- ===================== 지도 탭 ===================== -->
-  <section class="view" id="view-map">
+  <section class="view is-active" id="view-map">
     <div class="map-view-wrap">
       <div id="naver-map"></div>
       <div class="map-toast" id="map-toast"></div>
@@ -6276,6 +6276,25 @@ function showPinSummary(index) {
   pinInfoWindow.open(naverMap, mapMarkers[index]);
 }
 
+// 핀을 탭하면 그 장소를 "현재 위치"로 바로 이동시켜서, 이후 이전/다음 버튼이 그
+// 지점부터 이어지도록 한다(구간 애니메이션 없이 즉시 이동 — 순서를 건너뛴 지점으로
+// 갈 수도 있어 중간 구간을 달리는 게 오히려 헷갈린다).
+function jumpToStop(index) {
+  viewingMyLocation = false;
+  if (index === currentIndex) return;
+  if (carAnimRaf) cancelAnimationFrame(carAnimRaf);
+  if (carAnimFallback) clearTimeout(carAnimFallback);
+  hideToast();
+  currentIndex = index;
+  updateMapUI();
+  if (naverMap && carMarker) {
+    const place = ROUTE[index];
+    const latLng = new naver.maps.LatLng(place.lat, place.lng);
+    carMarker.setPosition(latLng);
+    naverMap.setCenter(latLng);
+  }
+}
+
 function pathLatLngs(coords) { return coords.map((c) => new naver.maps.LatLng(c[0], c[1])); }
 
 function fullPathCoords() {
@@ -6300,7 +6319,7 @@ function initOverviewMap() {
     zIndex: 10
   }));
   mapMarkers.forEach((marker, i) => {
-    naver.maps.Event.addListener(marker, 'click', () => showPinSummary(i));
+    naver.maps.Event.addListener(marker, 'click', () => { jumpToStop(i); showPinSummary(i); });
   });
   naver.maps.Event.addListener(naverMap, 'click', () => { if (pinInfoWindow) pinInfoWindow.close(); });
 
@@ -6580,6 +6599,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-next').addEventListener('click', () => goToStop(currentIndex + 1));
   document.getElementById('btn-mylocation').addEventListener('click', locateMe);
 
+  // 지도 탭이 첫 화면이라 클릭 없이도 지도 탭 진입 시와 동일한 초기화(높이 맞춤,
+  // SDK 로딩 등)를 실행해줘야 한다.
+  switchTab('map');
   updateMapUI();
 
   resolveAllSegments().then(() => {
