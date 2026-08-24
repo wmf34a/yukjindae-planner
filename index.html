@@ -116,11 +116,13 @@
   }
   .tab-btn.is-active { background: var(--color-primary); color: #fff; }
 
-  /* 육진대(SNS)만 별도 화면으로 전환되고, 지도/코스목록은 #screen-main 안에서 탭에 따라 서로 하나만 보인다. */
+  /* 육진대(SNS)만 별도 화면으로 전환된다. 지도 탭에서는 지도+코스목록이 같이 있어 아래로
+     스크롤하면 코스목록이 보이고, 코스목록 탭에서는 지도를 아예 감춰서 목록만 채워 보여준다. */
   .screen { display: none; flex-direction: column; flex: 1; }
   .screen.is-active { display: flex; }
 
-  #view-map, #view-course { display: none; }
+  #view-map, #view-course { scroll-margin-top: 64px; } /* 탭바가 sticky라 스크롤 이동 시 가려지지 않도록 여유를 둔다 */
+  #view-map { display: none; }
   #view-map.is-active {
     flex: none;
     height: 56vh;
@@ -131,7 +133,7 @@
     flex-direction: column;
   }
   @supports (height: 56dvh) { #view-map.is-active { height: 56dvh; } } /* 모바일 브라우저 주소창 높이 변화까지 반영 */
-  #view-course.is-active { display: flex; flex-direction: column; flex: 1; }
+  #view-course { display: flex; flex-direction: column; flex: 1; }
 
   /* ---------- Summary banner ---------- */
   .summary-banner {
@@ -6204,8 +6206,8 @@ function renderMiniMap(place) {
 }
 
 /* ===================== 탭 전환 ===================== */
-// 지도와 코스목록은 #screen-main 안에서 탭에 따라 서로 하나만 보이고, 육진대(SNS)만
-// 화면 자체를 완전히 바꾸는 별도 화면이다.
+// 지도 탭: 지도+코스목록이 같이 있어 아래로 스크롤하면 코스목록이 보인다.
+// 코스목록 탭: 지도를 감추고 목록만 채워 보여준다. 육진대(SNS)만 화면 자체를 바꾸는 별도 화면이다.
 function isMainScreenActive() {
   return document.getElementById('screen-main').classList.contains('is-active')
     && document.getElementById('view-map').classList.contains('is-active');
@@ -6217,12 +6219,13 @@ function ensureMapReady() {
   } else if (scriptState === 'failed') {
     showMapFallback();
   } else if (naverMap) {
-    refitMapBounds(); // 화면이 숨겨져 있던 동안(육진대 탭) 크기 캐시가 어긋났을 수 있어 다시 맞춘다.
+    refitMapBounds(); // 화면이 숨겨져 있던 동안(육진대/코스목록 탭) 크기 캐시가 어긋났을 수 있어 다시 맞춘다.
   }
   ensureNaverScriptLoading();
 }
 
-function switchTab(tab) {
+function switchTab(tab, opts) {
+  const scroll = !opts || opts.scroll !== false;
   document.querySelectorAll('.tab-btn').forEach((b) => {
     const active = b.dataset.tab === tab;
     b.classList.toggle('is-active', active);
@@ -6237,10 +6240,12 @@ function switchTab(tab) {
   document.getElementById('screen-main').classList.add('is-active');
   document.getElementById('view-sns').classList.remove('is-active');
   document.getElementById('view-map').classList.toggle('is-active', tab === 'map');
-  document.getElementById('view-course').classList.toggle('is-active', tab === 'course');
   if (tab === 'map') {
     // 지도가 화면에 보이는 상태에서 초기화해야 컨테이너가 0 크기가 되는 문제를 피할 수 있다.
     ensureMapReady();
+  }
+  if (scroll) {
+    document.getElementById(tab === 'course' ? 'view-course' : 'view-map').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 }
 
@@ -6636,8 +6641,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-next').addEventListener('click', () => goToStop(currentIndex + 1));
   document.getElementById('btn-mylocation').addEventListener('click', locateMe);
 
-  // 지도가 첫 화면이라 클릭 없이도 지도 진입 시와 동일한 초기화(SDK 로딩 등)를 실행해줘야 한다.
-  switchTab('map');
+  // 지도가 첫 화면이라 클릭 없이도 지도 진입 시와 동일한 초기화(SDK 로딩 등)를 실행해줘야
+  // 한다. 이미 화면 맨 위이므로 scroll:false로 불필요한 스크롤 애니메이션은 건너뛴다.
+  switchTab('map', { scroll: false });
   updateMapUI();
 
   resolveAllSegments().then(() => {
