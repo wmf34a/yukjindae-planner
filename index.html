@@ -36,16 +36,16 @@
 <title>육진대 × 원주여행</title>
 <style>
   :root {
-    --color-primary: #1A2F6B;
-    --color-primary-dark: #0D1B3E;
-    --color-accent: #2563EB;
-    --color-bg: #F0F4FF;
+    --color-primary: #5B6B95;
+    --color-primary-dark: #3C4972;
+    --color-accent: #8D9BC4;
+    --color-bg: #F5F6FA;
     --color-card: #FFFFFF;
-    --color-text: #0D1B3E;
-    --color-text-secondary: #5C6B8A;
-    --color-border: #E1E7FA;
+    --color-text: #3A4363;
+    --color-text-secondary: #7B84A3;
+    --color-border: #E7E9F2;
     --radius: 16px;
-    --shadow: 0 4px 16px rgba(13, 27, 62, 0.08);
+    --shadow: 0 4px 16px rgba(58, 67, 99, 0.08);
     --max-width: 480px;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -6259,7 +6259,7 @@ let myLocationMarker = null;
 let viewingMyLocation = false; // 내 위치로 지도를 이동시킨 상태인지(여행지에서 멀리 떨어진 곳일 수 있어, 이전/다음을 누르면 코스로 복귀시킨다)
 
 function pinIcon(place, number, isCurrent) {
-  const color = isCurrent ? '#2563EB' : '#1A2F6B';
+  const color = isCurrent ? '#8D9BC4' : '#5B6B95';
   return {
     content: `
       <div class="pin-wrap">
@@ -6281,7 +6281,7 @@ function carIcon(mode) {
 
 function myLocationIcon() {
   return {
-    content: `<div style="width:16px;height:16px;border-radius:50%;background:#4285F4;border:3px solid #fff;box-shadow:0 0 0 3px rgba(66,133,244,0.35), 0 2px 4px rgba(0,0,0,0.3);"></div>`,
+    content: `<div style="width:16px;height:16px;border-radius:50%;background:#5B6B95;border:3px solid #fff;box-shadow:0 0 0 3px rgba(91,107,149,0.35), 0 2px 4px rgba(0,0,0,0.3);"></div>`,
     anchor: new naver.maps.Point(11, 11)
   };
 }
@@ -6289,10 +6289,10 @@ function myLocationIcon() {
 function pinSummaryContent(place, index) {
   return `
     <div style="padding:10px 12px;min-width:170px;max-width:210px;font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;">
-      <div style="font-size:11px;font-weight:700;color:#1A2F6B;margin-bottom:3px;">${place.emoji} ${place.category}</div>
-      <div style="font-size:14px;font-weight:800;color:#0D1B3E;margin-bottom:6px;line-height:1.3;">${index + 1}. ${place.name}</div>
-      <div style="font-size:11.5px;color:#5C6B8A;line-height:1.5;margin-bottom:8px;">🕒 ${place.hoursSummary}</div>
-      <button type="button" onclick="window.openDetailModal('${place.id}')" style="width:100%;border:none;background:#1A2F6B;color:#fff;font-size:12px;font-weight:700;padding:7px 0;border-radius:8px;cursor:pointer;">상세보기</button>
+      <div style="font-size:11px;font-weight:700;color:#5B6B95;margin-bottom:3px;">${place.emoji} ${place.category}</div>
+      <div style="font-size:14px;font-weight:800;color:#3A4363;margin-bottom:6px;line-height:1.3;">${index + 1}. ${place.name}</div>
+      <div style="font-size:11.5px;color:#7B84A3;line-height:1.5;margin-bottom:8px;">🕒 ${place.hoursSummary}</div>
+      <button type="button" onclick="window.openDetailModal('${place.id}')" style="width:100%;border:none;background:#5B6B95;color:#fff;font-size:12px;font-weight:700;padding:7px 0;border-radius:8px;cursor:pointer;">상세보기</button>
     </div>
   `;
 }
@@ -6300,7 +6300,7 @@ function pinSummaryContent(place, index) {
 function showPinSummary(index) {
   const place = ROUTE[index];
   if (!pinInfoWindow) {
-    pinInfoWindow = new naver.maps.InfoWindow({ content: '', maxWidth: 220, backgroundColor: '#fff', borderColor: '#E1E7FA', borderWidth: 1, anchorSize: new naver.maps.Size(12, 10), pixelOffset: new naver.maps.Point(0, -4) });
+    pinInfoWindow = new naver.maps.InfoWindow({ content: '', maxWidth: 220, backgroundColor: '#fff', borderColor: '#E7E9F2', borderWidth: 1, anchorSize: new naver.maps.Size(12, 10), pixelOffset: new naver.maps.Point(0, -4) });
   }
   pinInfoWindow.setContent(pinSummaryContent(place, index));
   pinInfoWindow.open(naverMap, mapMarkers[index]);
@@ -6354,24 +6354,29 @@ function initOverviewMap() {
   naver.maps.Event.addListener(naverMap, 'click', () => { if (pinInfoWindow) pinInfoWindow.close(); });
 
   const full = fullPathCoords();
-  remainingPolyline = new naver.maps.Polyline({ map: naverMap, path: pathLatLngs(full), strokeColor: '#9AA5B1', strokeOpacity: 0.9, strokeWeight: 4, strokeStyle: 'shortdash' });
-  traveledPolyline = new naver.maps.Polyline({ map: naverMap, path: [], strokeColor: '#1A2F6B', strokeOpacity: 0.95, strokeWeight: 5 });
+  remainingPolyline = new naver.maps.Polyline({ map: naverMap, path: pathLatLngs(full), strokeColor: '#B7BFDD', strokeOpacity: 0.9, strokeWeight: 4, strokeStyle: 'shortdash' });
+  traveledPolyline = new naver.maps.Polyline({ map: naverMap, path: [], strokeColor: '#5B6B95', strokeOpacity: 0.95, strokeWeight: 5 });
 
   carMarker = new naver.maps.Marker({ position: new naver.maps.LatLng(startPlace.lat, startPlace.lng), map: naverMap, icon: carIcon('car'), zIndex: 25 });
   carInfoWindow = new naver.maps.InfoWindow({ content: '', disableAnchor: true, backgroundColor: 'transparent', borderWidth: 0 });
 
-  const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(ROUTE[0].lat, ROUTE[0].lng), new naver.maps.LatLng(ROUTE[0].lat, ROUTE[0].lng));
-  ROUTE.forEach((p) => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
-  naverMap.fitBounds(bounds, { top: 50, right: 40, bottom: 50, left: 40 });
+  fitRouteBounds();
 
   updateMapUI();
 }
 
-function refitMapBounds() {
-  if (!naverMap) return;
+// fitBounds가 맞춰주는 배율은 여백까지 감안해 다소 축소되어 가독성이 떨어지므로,
+// 맞춘 뒤 한 단계 더 확대해 지명/핀 라벨이 잘 보이도록 한다.
+function fitRouteBounds() {
   const bounds = new naver.maps.LatLngBounds(new naver.maps.LatLng(ROUTE[0].lat, ROUTE[0].lng), new naver.maps.LatLng(ROUTE[0].lat, ROUTE[0].lng));
   ROUTE.forEach((p) => bounds.extend(new naver.maps.LatLng(p.lat, p.lng)));
   naverMap.fitBounds(bounds, { top: 50, right: 40, bottom: 50, left: 40 });
+  naverMap.setZoom(Math.min(naverMap.getZoom() + 1, 15));
+}
+
+function refitMapBounds() {
+  if (!naverMap) return;
+  fitRouteBounds();
 }
 
 function showToast(text) {
@@ -6412,7 +6417,8 @@ function locateMe() {
       } else {
         myLocationMarker = new naver.maps.Marker({ position: latLng, map: naverMap, icon: myLocationIcon(), zIndex: 30 });
       }
-      naverMap.morph(latLng, Math.max(naverMap.getZoom(), 13));
+      naverMap.setCenter(latLng);
+      naverMap.setZoom(Math.max(naverMap.getZoom(), 13));
       viewingMyLocation = true;
     },
     (err) => {
@@ -6512,7 +6518,10 @@ function goToStop(nextIndex) {
     updateMapUI();
     if (naverMap) {
       const place = ROUTE[0];
-      naverMap.morph(new naver.maps.LatLng(place.lat, place.lng), 13);
+      // 내 위치가 코스와 멀리 떨어져 있으면 morph(애니메이션 이동)가 사용자의 터치/드래그에
+      // 끊겨 화면이 그대로 멈춰 보일 수 있어, 끊기지 않는 즉시 이동으로 확실히 복귀시킨다.
+      naverMap.setCenter(new naver.maps.LatLng(place.lat, place.lng));
+      naverMap.setZoom(13);
     }
     return;
   }
@@ -6535,7 +6544,7 @@ function goToStop(nextIndex) {
     updateMapUI();
     const place = ROUTE[currentIndex];
     if (carInfoWindow) {
-      carInfoWindow.setContent(`<div style="padding:6px 10px;background:#0D1B3E;color:#fff;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;">📍 도착: ${place.name}</div>`);
+      carInfoWindow.setContent(`<div style="padding:6px 10px;background:#3C4972;color:#fff;border-radius:8px;font-size:12px;font-weight:700;white-space:nowrap;">📍 도착: ${place.name}</div>`);
       carInfoWindow.open(naverMap, carMarker);
       setTimeout(() => carInfoWindow.close(), 2500);
     }
