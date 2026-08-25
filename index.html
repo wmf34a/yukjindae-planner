@@ -5838,7 +5838,7 @@
 
         <div class="modal-info-block">
           <p class="modal-info-block__label">📍 주소</p>
-          <p class="modal-info-block__value is-link" id="modal-address"></p>
+          <p class="modal-info-block__value" id="modal-address"></p>
           <div class="modal-minimap" id="modal-minimap"></div>
         </div>
       </div>
@@ -6161,7 +6161,6 @@ function openDetailModal(placeId) {
     : `전화번호 확인 필요`;
   const addressEl = document.getElementById('modal-address');
   addressEl.textContent = place.address;
-  addressEl.onclick = () => window.open(mapSearchUrl(place), '_blank', 'noopener');
 
   const directionsBtn = document.getElementById('modal-directions-btn');
   if (place.directionUrl) {
